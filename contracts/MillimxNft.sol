@@ -11,22 +11,37 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 contract MillimxNft is ERC721URIStorage, ERC721Enumerable, Ownable, ReentrancyGuard {
   using Counters for Counters.Counter;
 
-  address payable public immutable feeAccount; // 수수료를 받을 주소
-  uint256 public feePercent; // 팔때 받을 수수료
+  // 민팅 수수료 지갑 어떤걸로?
+  address payable public mintFeeAccount;
+  uint256 public mintFee;
 
-  mapping (uint => bool) isOnMarket; // tokenId => enrolled on market
+  // 쇼타임 구매수수료 지갑
+  address payable public smPurchaseFeeAccount;
+  uint256 public smPurchaseFeePercent;
+
+  // 선물하기 배송비 지갑
+  address payable public giftFeeAccount;
+  uint256 public giftFee;
+
+  // 쇼타임민팅용 지갑
+  address payable public smMintAccount;
+
+  modifier onlyShowtimeMinter() {
+    require(smMintAccount == msg.sender, "caller is not the ShowtimeMinter");
+    _;
+  }
+
+  mapping (uint => bool) isOnMarket;
   mapping (uint256 => ShowTimeItem) public showTimeItems;
 
   mapping (uint256 => address[]) public splitAddress;
   mapping (uint256 => uint256[]) public splitPercent;
 
-  uint256 public mintPrice; // 민팅 가격
-  uint256 public totalSupplied; // 현재까지 발행된 총 수량
-  Counters.Counter public tokenCount; // 발행할 NFT 토큰 Id
-  uint256 public normalNftTransferFeePrice; // 일반NFT전송시 전송수수료(배송비)
+  uint256 public totalSupplied;
+  Counters.Counter public tokenCount;
 
   struct ShowTimeItem {
-    uint256 tokenId;  // 판매할 토큰 id
+    uint256 tokenId;
     uint256 price;
     address payable seller;
     bool sold;
@@ -52,25 +67,53 @@ contract MillimxNft is ERC721URIStorage, ERC721Enumerable, Ownable, ReentrancyGu
     address indexed buyer
   );
 
-  event ShowTimeNftTransfer(
-    uint256 tokenId,
-    address indexed toAddress
-  );
-
-  event NormalNftTransfer(
+  event NftGift(
     uint256 tokenId,
     address indexed fromAddress,
     address indexed toAddress
   );
 
-  constructor (uint _mintPrice, uint _feePercent) ERC721("Millim:X","MLX") {
-    mintPrice = _mintPrice;
-    feePercent = _feePercent;
-    feeAccount = payable(msg.sender);
-    normalNftTransferFeePrice = 0;
+  event MintFee(
+    uint256 tokenId,
+    address indexed millimxAddress,
+    uint256 feePercent,
+    uint256 feePrice
+  );
+
+  event ShowTimeBoughtFee(
+    uint256 tokenId,
+    address indexed millimxAddress,
+    uint256 feePercent,
+    uint256 feePrice
+  );
+
+  event GiftFee(
+    uint256 tokenId,
+    address indexed millimxAddress,
+    uint256 feePercent,
+    uint256 feePrice
+  );
+
+  event ShowTimeRoyalty(
+    uint256 tokenId,
+    address indexed royaltyAddress,
+    uint256 royaltyPercent,
+    uint256 royaltyPrice
+  );
+
+  constructor (uint _mintFee, uint _feePercent, uint _nftGiftFee) ERC721("Millim:X","MLX") {
+    mintFeeAccount = payable(0x2B8b712479e39BB2aA3C927a3A5b016036Eecc7E);
+    mintFee = _mintFee;
+
+    smPurchaseFeeAccount = payable(0xdca8329006F93E2905663010cAE895109db0b14c);
+    smPurchaseFeePercent = _feePercent;
+
+    giftFeeAccount = payable(0x341DEd1deb57863b22af117D0d7EAec400969e5a);
+    giftFee = _nftGiftFee;
+
+    smMintAccount = payable(0x4d6B9F1fA7ED84E2A78d218B2b7f0FA46ecCf3ea);
   }
 
-  /* override functions related to ERC721*/
   function _beforeTokenTransfer(address from, address to, uint256 tokenId)
   internal
   override(ERC721, ERC721Enumerable)
@@ -104,22 +147,41 @@ contract MillimxNft is ERC721URIStorage, ERC721Enumerable, Ownable, ReentrancyGu
     _safeMint(to, tokenId);
   }
 
-  function setMintPrice (uint256 _mintPrice) external onlyOwner {
-    mintPrice = _mintPrice;
+  function setMintFeeAccount (address _mintFeeAccount) external onlyOwner {
+    require(_mintFeeAccount != address(0), "MintFeeAccount is the zero address");
+    mintFeeAccount = payable(_mintFeeAccount);
   }
 
-  function setFeePercent (uint256 _feePercent) external onlyOwner {
-    feePercent = _feePercent;
+  function setMintFee (uint256 _mintFee) external onlyOwner {
+    mintFee = _mintFee;
   }
 
-  function setNormalNftTransferFeePrice (uint256 _normalNftTransferFeePrice) external onlyOwner {
-    normalNftTransferFeePrice = _normalNftTransferFeePrice;
+  function setSmPurchaseFeeAccount (address _smPurchaseFeeAccount) external onlyOwner {
+    require(_smPurchaseFeeAccount != address(0), "SmPurchaseFeeAccount is the zero address");
+    smPurchaseFeeAccount = payable(_smPurchaseFeeAccount);
+  }
+
+  function setSmPurchaseFeePercent (uint256 _smPurchaseFeePercent) external onlyOwner {
+    smPurchaseFeePercent = _smPurchaseFeePercent;
+  }
+
+  function setGiftFeeAccount (address _giftFeeAccount) external onlyOwner {
+    require(_giftFeeAccount != address(0), "GiftFeeAccount is the zero address");
+    giftFeeAccount = payable(_giftFeeAccount);
+  }
+
+  function setGiftFee (uint256 _giftFee) external onlyOwner {
+    giftFee = _giftFee;
+  }
+
+  function setSmMintAccount (address _smMintAccount) external onlyOwner {
+    require(_smMintAccount != address(0), "GiftFeeAccount is the zero address");
+    smMintAccount = payable(_smMintAccount);
   }
 
 
-  /* 일반 Minting */
   function minting (string memory _tokenURI, address[] memory _splitAddress, uint256[] memory _splitPercent) external payable returns (uint256) {
-    require(msg.value == mintPrice, "Wrong value sent.");
+    require(msg.value == mintFee, "Wrong value sent.");
 
     tokenCount.increment();
     uint256 newTokenId = tokenCount.current();
@@ -127,6 +189,14 @@ contract MillimxNft is ERC721URIStorage, ERC721Enumerable, Ownable, ReentrancyGu
     _setTokenURI(newTokenId, _tokenURI);
     emit Minted(newTokenId, _tokenURI, msg.sender);
     totalSupplied = newTokenId;
+
+    mintFeeAccount.transfer(msg.value);
+    emit MintFee(
+      newTokenId,
+      mintFeeAccount,
+      mintFee,
+      msg.value
+    );
 
     for(uint j=0; j< _splitAddress.length; j++) {
       splitAddress[newTokenId].push(_splitAddress[j]);
@@ -136,8 +206,7 @@ contract MillimxNft is ERC721URIStorage, ERC721Enumerable, Ownable, ReentrancyGu
     return newTokenId;
   }
 
-  /** Showtime Minting */
-  function showTimeMinting (string[] memory _tokenURIs, uint256[] memory _sellPrices, address[] memory _splitAddress, uint256[] memory _splitPercent) external onlyOwner payable  {
+  function showTimeMinting (string[] memory _tokenURIs, uint256[] memory _sellPrices, address[] memory _splitAddress, uint256[] memory _splitPercent) external onlyShowtimeMinter payable  {
     for(uint i=0; i< _tokenURIs.length; i++) {
       tokenCount.increment();
       uint256 newTokenId = tokenCount.current();
@@ -159,18 +228,15 @@ contract MillimxNft is ERC721URIStorage, ERC721Enumerable, Ownable, ReentrancyGu
         msg.sender
       );
 
-      // 민팅한 토큰을 스마트컨트랙트로 전송
       transferFrom(msg.sender, address(this), newTokenId);
 
       for(uint j=0; j< _splitAddress.length; j++) {
         splitAddress[newTokenId].push(_splitAddress[j]);
         splitPercent[newTokenId].push(_splitPercent[j]);
       }
-
     }
   }
 
-  /** Showtime 구매 */
   function showTimePurchase(uint256 _tokenId) external payable nonReentrant {
     uint256 _price = showTimeItems[_tokenId].price;
     ShowTimeItem storage showTimeItem = showTimeItems[_tokenId];
@@ -178,23 +244,30 @@ contract MillimxNft is ERC721URIStorage, ERC721Enumerable, Ownable, ReentrancyGu
     require(msg.value >= _price , "Not enough ether to cover item price and market fee");
     require(!showTimeItem.sold, "Sold out!");
 
-    // 회사가 먹는 거래수수료
-    feeAccount.transfer(calculateFee(_price, feePercent));
+    smPurchaseFeeAccount.transfer(calculateFee(_price, smPurchaseFeePercent));
+    emit ShowTimeBoughtFee(
+      _tokenId,
+      smPurchaseFeeAccount,
+      smPurchaseFeePercent,
+      calculateFee(_price, smPurchaseFeePercent)
+    );
 
-    _price = _price - calculateFee(_price, feePercent);
+    _price = _price - calculateFee(_price, smPurchaseFeePercent);
 
-    // 수익분배자들한테 수익률대로 전달함
     for(uint i=0; i< splitAddress[_tokenId].length; i++) {
       payable(splitAddress[_tokenId][i]).transfer(calculateFee(_price, splitPercent[_tokenId][i]));
+      emit ShowTimeRoyalty(
+        _tokenId,
+        splitAddress[_tokenId][i],
+        splitPercent[_tokenId][i],
+        calculateFee(_price, splitPercent[_tokenId][i])
+      );
     }
 
-    // update item to sold
     showTimeItem.sold = true;
 
-    // transfer nft to buyer
     _transfer(address(this), msg.sender, _tokenId);
 
-    // emit Bought event
     emit ShowTimeBought(
       _tokenId,
       showTimeItem.price,
@@ -203,95 +276,93 @@ contract MillimxNft is ERC721URIStorage, ERC721Enumerable, Ownable, ReentrancyGu
     );
   }
 
-  /** Showtime NFT 선물하기 */
-  function showTimeNftTransfer(uint256 _tokenId, address toAddress) external onlyOwner payable nonReentrant {
-    ShowTimeItem storage showTimeItem = showTimeItems[_tokenId];
-    // 내가 가지고 있는것만 선물하기 되야 함
-    require(msg.sender == ownerOf(_tokenId), "Only owner can enroll");
+  function showTimeFreeMinting (string memory _tokenURI, address[] memory _toAddress, address[] memory _splitAddress, uint256[] memory _splitPercent) external onlyOwner payable  {
+    for(uint i=0; i< _toAddress.length; i++) {
+      tokenCount.increment();
+      uint256 newTokenId = tokenCount.current();
+      _safeMint(msg.sender, newTokenId);
+      _setTokenURI(newTokenId, _tokenURI);
+      totalSupplied = newTokenId;
 
-    // transfer nft to buyer
-    _transfer(address(this), toAddress, showTimeItem.tokenId);
+      showTimeItems[newTokenId] = ShowTimeItem(
+        newTokenId,
+        0,
+        payable(msg.sender),
+        false
+      );
 
-    // emit ShowTimeNftTransfer event
-    emit ShowTimeNftTransfer(
-      _tokenId,
-      toAddress
-    );
+      emit ShowTimeMinted(
+        newTokenId,
+        _tokenURI,
+        0,
+        msg.sender
+      );
+
+      _transfer(msg.sender, _toAddress[i], newTokenId);
+
+      for(uint j=0; j< _splitAddress.length; j++) {
+        splitAddress[newTokenId].push(_splitAddress[j]);
+        splitPercent[newTokenId].push(_splitPercent[j]);
+      }
+    }
   }
 
-  /** 일반 NFT 선물하기 */
-  function normalNftTransfer(uint256 _tokenId, address toAddress) external payable nonReentrant {
-    ShowTimeItem storage showTimeItem = showTimeItems[_tokenId];
-    // 내가 가지고 있는것만 선물하기 되야 함
+  function nftGift(uint256 _tokenId, address toAddress) external payable nonReentrant {
     require(msg.sender == ownerOf(_tokenId), "Only owner can enroll");
+    require(!isOnMarket[_tokenId], "This is on the market");
 
-    if(normalNftTransferFeePrice > 0) { // 배송비가 무료가 아니라면?
-      // 배송비 체크
-      require(msg.value == normalNftTransferFeePrice, "Wrong value normalNftTransferFeePrice.");
+    if(giftFee > 0) {
+      require(msg.value >= giftFee , "Not enough ether to NFT give a gift fee price");
+      giftFeeAccount.transfer(msg.value);
+      emit GiftFee(
+        _tokenId,
+        giftFeeAccount,
+        giftFee,
+        msg.value
+      );
     }
 
-    // transfer nft to buyer
-    _transfer(address(this), toAddress, showTimeItem.tokenId);
+    _transfer(msg.sender, toAddress, _tokenId);
 
-    // emit ShowTimeNftTransfer event
-    emit NormalNftTransfer(
+    emit NftGift(
       _tokenId,
       msg.sender,
       toAddress
     );
   }
 
-  // 마켓 등록 여부 가져오기
   function getIsOnMarket(uint _tokenId) external view returns(bool) {
     return isOnMarket[_tokenId];
   }
-  // 마켓 등록 여부 설정
   function setIsOnMarket(uint _tokenId, bool _isOnMarket) external {
     isOnMarket[_tokenId]  = _isOnMarket;
   }
 
-  // 내 NFT 목록
   function getMyNftItems(uint256 _balanceIndex) external view returns (string memory, uint256) {
     uint256 tokenId = tokenOfOwnerByIndex(msg.sender, _balanceIndex);
     string memory tokenUri = tokenURI(tokenId);
     return (tokenUri, tokenId);
   }
 
-  // 내 NFT TokenUri
   function getMyNftItemDetail(uint256 _tokenId) external view returns (string memory) {
     string memory tokenUri = tokenURI(_tokenId);
     return (tokenUri);
   }
 
-  // 수수료 계산
   function calculateFee(uint256 _price, uint256 _percent) internal pure returns (uint256) {
     require((_price / 1000000) * 1000000 == _price, 'too small');
     return (_price * (_percent)) / 1000000;
   }
 
-  // 로열티 받을 주소들
   function getSplitAddress(uint _tokenId) external view returns(address[] memory) {
     return splitAddress[_tokenId];
   }
 
-  // 로열티 퍼센트들
   function getSplitPercent(uint _tokenId) external view returns(uint256[] memory) {
     return splitPercent[_tokenId];
   }
 
-  // 출금
   function withdraw() external payable onlyOwner {
-    // =============================================================================
-    // This will transfer the remaining contract balance to the owner.
-    // Do not remove this otherwise you will not be able to withdraw the funds.
-    // =============================================================================
     payable(msg.sender).transfer(address(this).balance);
-    // =============================================================================
   }
-
 }
-
-// 회사 지갑주소
-// 0x7072bE4997CEF6a6c2758479f6565Be45c3b5E50
-// 회사 개인키
-// 765e11be658a3afb69148f07c6a42298f78fde029c2dcafa01809d2503b6f294

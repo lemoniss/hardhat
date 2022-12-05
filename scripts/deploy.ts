@@ -10,8 +10,9 @@ async function main() {
   // We get the contract to deploy
   console.log("Deploying MillimxNft");
   // 20000 = 2%, 25000 = 2.5%, 50000 = 5%,
+  // 민팅수수료 : 0.005ETH , 거래수수료 : 5% , 선물배송비 : 0.009ETH
   const MillimxNft = await ethers.getContractFactory("MillimxNft");
-  const millimxNft = await (await MillimxNft.deploy(ethers.utils.parseEther("0.005"), 50000)).deployed();
+  const millimxNft = await (await MillimxNft.deploy(ethers.utils.parseEther("0.005"), 50000, ethers.utils.parseEther("0.009"))).deployed();
   console.log("MillimxNft address:", millimxNft.address);
 
   // console.log("Deploying Showtime");
@@ -21,9 +22,10 @@ async function main() {
   // console.log("Showtime address:", showtime.address);
 
   console.log("Deploying Marketplace");
-  // 20000 = 2%, 25000 = 2.5%, 50000 = 5%,
+  // 20000 = 2%, 25000 = 2.5%, 50000 = 5%, 75000 = 7.5%
+  // 거래수수료 : 5% , 로열티 : 7.5%
   const Marketplace = await ethers.getContractFactory("Marketplace");
-  const marketplace = await (await Marketplace.deploy(50000)).deployed();
+  const marketplace = await (await Marketplace.deploy(50000, 75000)).deployed();
   console.log("Marketplace address:", marketplace.address);
 
   // console.log("Deploying Auction");

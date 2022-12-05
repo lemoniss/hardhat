@@ -61,23 +61,38 @@ const getPrivateKey = (): string[] => {
   // return process.env.PRIVATE_KEY !== undefined
   //   ? [process.env.PRIVATE_KEY]
   //   : ["0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"];
-  // return ['765e11be658a3afb69148f07c6a42298f78fde029c2dcafa01809d2503b6f294'];
-  return ['d6211af3767992685044516a1f9b83bc7593ac503e44087c677377d0ea2759fc'];
+  // return ['d6211af3767992685044516a1f9b83bc7593ac503e44087c677377d0ea2759fc'];
+  return ['08caf881162958f96765425dfb80accfd9e2c53b1fbf56c62deccb11676ff776'];
 };
 
 
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.4",
+  solidity: {
+    version: "0.8.4",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      }
+    },
+  },
   defaultNetwork: "localhost",
   networks: {
-    ropsten: {
-      // url: getURL("infura", "ropsten"),
-      url: "https://sparkling-little-lake.ropsten.quiknode.pro/f3003581158bf6d00b05698c6ee60989a8ab3ba7/",
+    mainnet: {
+      url: "https://long-autumn-hexagon.quiknode.pro/3a1172fa5b6b14cb89faf36e9ec7437fa3e0e69f/",
       accounts: getPrivateKey(),
     },
-    rinkeby: {
-      url: "https://late-sparkling-emerald.rinkeby.quiknode.pro/7e9a2258908e96261354cc97cbc10e5b5fa1a48c/",
+    goerli: {
+      url: "https://alien-warmhearted-thunder.ethereum-goerli.quiknode.pro/827f2b2950f22ab6da19fea1b97aabaf54062ec8/",
+      accounts: getPrivateKey(),
+    },
+    polytest: {
+      url: "https://long-twilight-resonance.matic-testnet.quiknode.pro/b85b1fa8e73b8facfc9e1845de9f81a66061de75/",
+      accounts: getPrivateKey(),
+    },
+    polymain: {
+      url: "https://fabled-maximum-lake.matic.quiknode.pro/f98223669f4e0759b8040ec23027348fcc1d37a3/",
       accounts: getPrivateKey(),
     },
   },
